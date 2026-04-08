@@ -64,7 +64,10 @@ public class OrbVisual {
     }
 
     /**
-     * Create a flat colored quad with alpha blending and face culling disabled.
+     * Create a flat colored quad with face culling disabled.
+     * Fully opaque quads (alpha >= ~1.0) use the Opaque bucket with depth write enabled.
+     * Semi-transparent quads use the Transparent bucket with depth test disabled so
+     * they always composite correctly over opaque geometry in orthographic projection.
      */
     private static Geometry coloredQuad(AssetManager am, String name,
                                          float size, ColorRGBA color, float alpha) {
@@ -74,11 +77,17 @@ public class OrbVisual {
         ColorRGBA c = color.clone();
         c.a = alpha;
         mat.setColor("Color", c);
-        mat.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
-        mat.getAdditionalRenderState().setDepthWrite(false);
         mat.getAdditionalRenderState().setFaceCullMode(RenderState.FaceCullMode.Off);
+        if (alpha < 0.999f) {
+            mat.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+            mat.getAdditionalRenderState().setDepthWrite(false);
+            mat.getAdditionalRenderState().setDepthTest(false);
+            g.setQueueBucket(RenderQueue.Bucket.Transparent);
+        } else {
+            // Fully opaque: Opaque bucket (default) with depth write explicitly enabled
+            mat.getAdditionalRenderState().setDepthWrite(true);
+        }
         g.setMaterial(mat);
-        g.setQueueBucket(RenderQueue.Bucket.Transparent);
         return g;
     }
 
