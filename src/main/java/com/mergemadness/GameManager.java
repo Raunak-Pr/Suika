@@ -3,9 +3,11 @@ package com.mergemadness;
 import com.jme3.asset.AssetManager;
 import com.jme3.font.BitmapFont;
 import com.jme3.input.InputManager;
+import com.jme3.input.KeyInput;
 import com.jme3.input.MouseInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.AnalogListener;
+import com.jme3.input.controls.KeyTrigger;
 import com.jme3.input.controls.MouseAxisTrigger;
 import com.jme3.input.controls.MouseButtonTrigger;
 import com.jme3.material.Material;
@@ -62,10 +64,19 @@ public class GameManager {
     private int screenW, screenH;
     private float viewHalfW, viewHalfH;
 
+    // Fixed canonical aspect ratio of the play area (matches the initial 420x720 window)
+    private static final float PLAY_ASPECT = 420f / 720f;
+
+    // Active game-area bounds in screen pixels (updated on resize for letterboxing/pillarboxing)
+    private float gameOffsetX = 0, gameOffsetY = 0;
+    private float gamePixelW, gamePixelH;
+
     private Node arenaNode;
     private Node orbNode;
+    private Geometry bgGeom;
     private Geometry guideLineGeom;
     private Geometry previewOrbGeom;
+    private boolean bgHidden = false;
 
     // Z-layers (camera at z=50 looking at z=0)
     static final float Z_BG       = 0f;
@@ -90,9 +101,9 @@ public class GameManager {
         screenW = cam.getWidth();
         screenH = cam.getHeight();
 
-        float aspect = (float) screenW / screenH;
+        // Fixed frustum: always shows the same world area regardless of window size
         viewHalfH = 8f;
-        viewHalfW = viewHalfH * aspect;
+        viewHalfW = viewHalfH * PLAY_ASPECT;
 
         // Orthographic camera: looking down -Z
         cam.setParallelProjection(true);
@@ -105,7 +116,12 @@ public class GameManager {
 
         bestScore = prefs.getInt("bestScore", 0);
         physics = new PhysicsEngine();
-        hud = new HudManager(guiNode, assetManager, screenW, screenH);
+
+        // Compute initial game-area bounds
+        prepareViewport(screenW, screenH);
+
+        hud = new HudManager(guiNode, assetManager, (int) gamePixelW, (int) gamePixelH,
+                (int) gameOffsetX, (int) gameOffsetY);
         hud.updateBest(bestScore);
 
         createArena();
@@ -126,7 +142,66 @@ public class GameManager {
     // ---- Coordinate mapping: screen pixels → world units ----
 
     private float screenToWorldX(float sx) {
-        return (sx / screenW - 0.5f) * 2f * viewHalfW;
+        // Account for pillarbox/letterbox: map from game-area pixels to world units
+        return ((sx - gameOffsetX) / gamePixelW - 0.5f) * 2f * viewHalfW;
+    }
+
+    // ---- Resize / viewport ----
+
+    /**
+     * Computes and applies viewport fractions that maintain PLAY_ASPECT by
+     * pillarboxing (if too wide) or letterboxing (if too tall).
+     * Must be called BEFORE jME3's own reshape so Camera.resize() uses the right
+     * viewport fraction when recalculating the frustum.
+     */
+    public void prepareViewport(int w, int h) {
+        float windowAspect = (float) w / h;
+        float l, r, b, t;
+        if (windowAspect > PLAY_ASPECT) {
+            // Window is too wide → pillarbox
+            float fraction = PLAY_ASPECT / windowAspect;
+            l = (1f - fraction) / 2f;
+            r = l + fraction;
+            b = 0f;
+            t = 1f;
+            gamePixelW = h * PLAY_ASPECT;
+            gamePixelH = h;
+            gameOffsetX = (w - gamePixelW) / 2f;
+            gameOffsetY = 0f;
+        } else {
+            // Window is too tall → letterbox
+            float fraction = windowAspect / PLAY_ASPECT;
+            l = 0f;
+            r = 1f;
+            b = (1f - fraction) / 2f;
+            t = b + fraction;
+            gamePixelW = w;
+            gamePixelH = w / PLAY_ASPECT;
+            gameOffsetX = 0f;
+            gameOffsetY = (h - gamePixelH) / 2f;
+        }
+        cam.setViewPortLeft(l);
+        cam.setViewPortRight(r);
+        cam.setViewPortBottom(b);
+        cam.setViewPortTop(t);
+    }
+
+    /**
+     * Called after jME3's own reshape(); restores the fixed frustum and updates
+     * the HUD so everything repositions to stay inside the active play area.
+     */
+    public void onResize(int w, int h) {
+        screenW = w;
+        screenH = h;
+        // Restore fixed frustum (jME3 may have adjusted it in Camera.resize)
+        cam.setFrustum(0.1f, 1000f, -viewHalfW, viewHalfW, -viewHalfH, viewHalfH);
+        if (hud != null) {
+            hud.onResize((int) gamePixelW, (int) gamePixelH,
+                    (int) gameOffsetX, (int) gameOffsetY);
+        }
+        System.out.println("[MM] Resize " + w + "x" + h +
+                " gameArea=" + (int) gamePixelW + "x" + (int) gamePixelH +
+                " offset=" + (int) gameOffsetX + "," + (int) gameOffsetY);
     }
 
     // ---- Arena ----
@@ -142,7 +217,7 @@ public class GameManager {
         float midY   = (ceilY + floorY) / 2f;
 
         // Background fill
-        makeBox("bg", 0, midY, Z_BG, hw, halfH,
+        bgGeom = makeBox("bg", 0, midY, Z_BG, hw, halfH,
                 new ColorRGBA(0.05f, 0.05f, 0.12f, 1f), false);
 
         // Left wall
@@ -219,13 +294,20 @@ public class GameManager {
         inputManager.addMapping("MX-", new MouseAxisTrigger(MouseInput.AXIS_X, true));
         inputManager.addMapping("MY+", new MouseAxisTrigger(MouseInput.AXIS_Y, false));
         inputManager.addMapping("MY-", new MouseAxisTrigger(MouseInput.AXIS_Y, true));
+        inputManager.addMapping("ToggleBG", new KeyTrigger(KeyInput.KEY_B));
 
         inputManager.addListener((ActionListener) (name, pressed, tpf) -> {
             if ("Click".equals(name) && pressed) {
                 System.out.println("[MM] CLICK state=" + state);
                 handleClick();
+            } else if ("ToggleBG".equals(name) && pressed) {
+                bgHidden = !bgHidden;
+                bgGeom.setCullHint(bgHidden
+                        ? com.jme3.scene.Spatial.CullHint.Always
+                        : com.jme3.scene.Spatial.CullHint.Inherit);
+                System.out.println("[MM] Background " + (bgHidden ? "hidden" : "visible"));
             }
-        }, "Click");
+        }, "Click", "ToggleBG");
 
         inputManager.addListener((AnalogListener) (name, value, tpf) -> {
             syncMouse();

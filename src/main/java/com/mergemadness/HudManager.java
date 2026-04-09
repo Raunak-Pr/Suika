@@ -14,8 +14,10 @@ public class HudManager {
 
     private final Node guiNode;
     private final BitmapFont font;
-    private final int screenWidth;
-    private final int screenHeight;
+    private int screenWidth;
+    private int screenHeight;
+    private int offsetX;
+    private int offsetY;
 
     // HUD elements
     private BitmapText scoreText;
@@ -33,11 +35,14 @@ public class HudManager {
     private float comboFadeTimer = 0;
     private float dangerPulseTimer = 0;
 
-    public HudManager(Node guiNode, AssetManager assetManager, int screenWidth, int screenHeight) {
+    public HudManager(Node guiNode, AssetManager assetManager, int screenWidth, int screenHeight,
+                      int offsetX, int offsetY) {
         this.guiNode = guiNode;
         this.font = assetManager.loadFont("Interface/Fonts/Default.fnt");
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
+        this.offsetX = offsetX;
+        this.offsetY = offsetY;
 
         createHudElements();
     }
@@ -45,58 +50,74 @@ public class HudManager {
     private void createHudElements() {
         // Score display (top left)
         scoreText = createText("0", 32, new ColorRGBA(0f, 0.94f, 1f, 1f));
-        scoreText.setLocalTranslation(16, screenHeight - 16, 0);
         guiNode.attachChild(scoreText);
 
         // Best score (below score)
         bestText = createText("BEST: 0", 14, new ColorRGBA(1f, 1f, 1f, 0.4f));
-        bestText.setLocalTranslation(16, screenHeight - 52, 0);
         guiNode.attachChild(bestText);
 
         // Combo display (center top)
         comboText = createText("", 24, new ColorRGBA(1f, 0.89f, 0.1f, 1f));
-        comboText.setLocalTranslation(screenWidth / 2f - 60, screenHeight - 20, 0);
         comboText.setColor(new ColorRGBA(1f, 0.89f, 0.1f, 0f));
         guiNode.attachChild(comboText);
 
         // Danger warning
         dangerText = createText("⚠ DANGER!", 20, new ColorRGBA(1f, 0.1f, 0.3f, 0f));
-        dangerText.setLocalTranslation(screenWidth / 2f - 60, screenHeight - 80, 0);
         guiNode.attachChild(dangerText);
 
         // Title screen
         titleText = createText("MERGE MADNESS", 36, new ColorRGBA(1f, 0.18f, 0.48f, 1f));
-        centerText(titleText, screenHeight / 2f + 60);
         guiNode.attachChild(titleText);
 
         titleSubText = createText("Drop & merge orbs — don't overflow!", 16, new ColorRGBA(1f, 1f, 1f, 0.5f));
-        centerText(titleSubText, screenHeight / 2f + 20);
         guiNode.attachChild(titleSubText);
 
         tapToPlayText = createText("CLICK TO PLAY", 22, new ColorRGBA(0f, 0.94f, 1f, 1f));
-        centerText(tapToPlayText, screenHeight / 2f - 40);
         guiNode.attachChild(tapToPlayText);
 
         // Game Over screen (hidden initially)
         gameOverText = createText("GAME OVER", 36, new ColorRGBA(1f, 0.1f, 0.3f, 1f));
-        centerText(gameOverText, screenHeight / 2f + 80);
         gameOverText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
         guiNode.attachChild(gameOverText);
 
         gameOverScoreText = createText("0", 48, new ColorRGBA(0f, 0.94f, 1f, 1f));
-        centerText(gameOverScoreText, screenHeight / 2f + 20);
         gameOverScoreText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
         guiNode.attachChild(gameOverScoreText);
 
         newBestText = createText("★ NEW BEST! ★", 20, new ColorRGBA(1f, 0.89f, 0.1f, 1f));
-        centerText(newBestText, screenHeight / 2f - 20);
         newBestText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
         guiNode.attachChild(newBestText);
 
         gameOverBestText = createText("BEST: 0", 16, new ColorRGBA(1f, 1f, 1f, 0.4f));
-        centerText(gameOverBestText, screenHeight / 2f - 50);
         gameOverBestText.setCullHint(com.jme3.scene.Spatial.CullHint.Always);
         guiNode.attachChild(gameOverBestText);
+
+        repositionElements();
+    }
+
+    /** Repositions all HUD elements based on the current game-area dimensions and offset. */
+    private void repositionElements() {
+        scoreText.setLocalTranslation(offsetX + 16, offsetY + screenHeight - 16, 0);
+        bestText.setLocalTranslation(offsetX + 16, offsetY + screenHeight - 52, 0);
+        comboText.setLocalTranslation(offsetX + screenWidth / 2f - 60, offsetY + screenHeight - 20, 0);
+        dangerText.setLocalTranslation(offsetX + screenWidth / 2f - 60, offsetY + screenHeight - 80, 0);
+
+        centerText(titleText, screenHeight / 2f + 60);
+        centerText(titleSubText, screenHeight / 2f + 20);
+        centerText(tapToPlayText, screenHeight / 2f - 40);
+        centerText(gameOverText, screenHeight / 2f + 80);
+        centerText(gameOverScoreText, screenHeight / 2f + 20);
+        centerText(newBestText, screenHeight / 2f - 20);
+        centerText(gameOverBestText, screenHeight / 2f - 50);
+    }
+
+    /** Called when the window is resized; repositions all HUD elements. */
+    public void onResize(int newGameWidth, int newGameHeight, int newOffsetX, int newOffsetY) {
+        this.screenWidth = newGameWidth;
+        this.screenHeight = newGameHeight;
+        this.offsetX = newOffsetX;
+        this.offsetY = newOffsetY;
+        repositionElements();
     }
 
     private BitmapText createText(String text, float size, ColorRGBA color) {
@@ -109,8 +130,8 @@ public class HudManager {
 
     private void centerText(BitmapText text, float y) {
         text.setLocalTranslation(
-            (screenWidth - text.getLineWidth()) / 2f,
-            y,
+            offsetX + (screenWidth - text.getLineWidth()) / 2f,
+            offsetY + y,
             0
         );
     }

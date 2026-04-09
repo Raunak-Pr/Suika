@@ -22,7 +22,7 @@ public class MergeMadnessApp extends SimpleApplication {
         settings.setTitle("Merge Madness");
         settings.setWidth(420);
         settings.setHeight(720);
-        settings.setResizable(false);
+        settings.setResizable(true);
         settings.setVSync(true);
         settings.setFrameRate(60);
         settings.setSamples(4); // anti-aliasing
@@ -32,6 +32,19 @@ public class MergeMadnessApp extends SimpleApplication {
         app.setShowSettings(false); // skip the jME settings dialog
         app.setPauseOnLostFocus(false);
         app.start();
+    }
+
+    @Override
+    public void reshape(int w, int h) {
+        // Set viewport fractions before super.reshape() recalculates the frustum,
+        // then force-restore our fixed frustum afterwards.
+        if (gameManager != null) {
+            gameManager.prepareViewport(w, h);
+        }
+        super.reshape(w, h);
+        if (gameManager != null) {
+            gameManager.onResize(w, h);
+        }
     }
 
     @Override
