@@ -18,9 +18,8 @@ line — or it's game over!
 mvn compile exec:exec
 ```
 
-> **Note:** The POM is pre-configured with `-XstartOnFirstThread` for macOS.
-> On Windows/Linux you can remove that flag from the `pom.xml` exec plugin,
-> but it won't cause issues if left in on those platforms.
+> **Note:** The POM automatically detects the OS. On macOS, `-XstartOnFirstThread`
+> is added for LWJGL3 compatibility. On Windows/Linux, it is omitted automatically.
 
 ### Build a fat JAR (all dependencies included):
 ```bash

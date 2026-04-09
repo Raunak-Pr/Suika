@@ -78,7 +78,6 @@
                 <configuration>
                     <executable>java</executable>
                     <arguments>
-                        <argument>-XstartOnFirstThread</argument>
                         <argument>-classpath</argument>
                         <classpath/>
                         <argument>com.mergemadness.MergeMadnessApp</argument>
@@ -119,4 +118,34 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- macOS: LWJGL3 requires the main thread to be the AppKit thread -->
+        <profile>
+            <id>mac</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <configuration>
+                            <executable>java</executable>
+                            <arguments>
+                                <argument>-XstartOnFirstThread</argument>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>com.mergemadness.MergeMadnessApp</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
