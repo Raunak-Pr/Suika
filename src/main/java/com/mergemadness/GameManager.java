@@ -111,6 +111,7 @@ public class GameManager {
         createArena();
 
         orbNode = new Node("orbNode");
+        orbNode.setCullHint(com.jme3.scene.Spatial.CullHint.Never);
         rootNode.attachChild(orbNode);
 
         particleMgr = new ParticleManager(rootNode, assetManager);
